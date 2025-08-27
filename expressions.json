@@ -1,67 +1,112 @@
 {
- "actor_expressions": {
-   "surprise_and_shock": [
-     "mild surprise",
-     "curious interest",
-     "slight confusion",
-     "raised eyebrows",
-     "gentle bewilderment"
-   ],
-   "betrayal_and_hurt": [
-     "disappointed look",
-     "slight sadness",
-     "thoughtful concern",
-     "quiet reflection",
-     "gentle resignation"
-   ],
-   "sneaky_and_mischievous": [
-     "subtle smile",
-     "gentle amusement",
-     "soft smirk",
-     "quiet confidence",
-     "hint of playfulness"
-   ],
-   "fear_and_anxiety": [
-     "cautious expression",
-     "mild concern",
-     "slight worry",
-     "gentle unease",
-     "thoughtful hesitation"
-   ],
-   "anger_and_frustration": [
-     "mild annoyance",
-     "slight frown",
-     "gentle disapproval",
-     "quiet irritation",
-     "soft frustration"
-   ],
-   "joy_and_excitement": [
-     "gentle happiness",
-     "soft smile",
-     "quiet contentment",
-     "mild delight",
-     "peaceful satisfaction"
-   ],
-   "sadness_and_grief": [
-     "gentle melancholy",
-     "soft sadness",
-     "quiet thoughtfulness",
-     "mild wistfulness",
-     "peaceful sorrow"
-   ],
-   "romantic_and_intimate": [
-     "gentle affection",
-     "soft warmth",
-     "tender expression",
-     "kind eyes",
-     "quiet fondness"
-   ],
-   "contemplative_and_mysterious": [
-     "thoughtful expression",
-     "gentle curiosity",
-     "quiet concentration",
-     "soft introspection",
-     "peaceful contemplation"
-   ]
- }
+  "actor_expressions": {
+    "surprise_and_shock": [
+      "mild surprise",
+      "curious interest",
+      "slight confusion",
+      "raised eyebrows",
+      "gentle bewilderment",
+      "wide-eyed astonishment",
+      "jaw-dropping disbelief",
+      "stunned speechlessness",
+      "double-take confusion",
+      "startled recoil"
+    ],
+    "betrayal_and_hurt": [
+      "disappointed look",
+      "slight sadness",
+      "thoughtful concern",
+      "quiet reflection",
+      "gentle resignation",
+      "wounded disbelief",
+      "bitter disappointment",
+      "slow-dawning realization",
+      "heartbroken devastation",
+      "cold, steely resolve"
+    ],
+    "sneaky_and_mischievous": [
+      "subtle smile",
+      "gentle amusement",
+      "soft smirk",
+      "quiet confidence",
+      "hint of playfulness",
+      "giggling conspiracy",
+      "sly sideways glance",
+      "barely contained glee",
+      "cat-like satisfaction",
+      "impish plotting"
+    ],
+    "fear_and_anxiety": [
+      "cautious expression",
+      "mild concern",
+      "slight worry",
+      "gentle unease",
+      "thoughtful hesitation",
+      "wide-eyed terror",
+      "nervous fidgeting",
+      "paranoid glancing",
+      "trembling uncertainty",
+      "frozen panic"
+    ],
+    "anger_and_frustration": [
+      "mild annoyance",
+      "slight frown",
+      "gentle disapproval",
+      "quiet irritation",
+      "soft frustration",
+      "seething rage",
+      "exasperated eye-roll",
+      "clenched-jaw fury",
+      "explosive outburst",
+      "simmering resentment"
+    ],
+    "joy_and_excitement": [
+      "gentle happiness",
+      "soft smile",
+      "quiet contentment",
+      "mild delight",
+      "peaceful satisfaction",
+      "bubbling enthusiasm",
+      "triumphant elation",
+      "childlike wonder",
+      "infectious laughter",
+      "beaming pride"
+    ],
+    "sadness_and_grief": [
+      "gentle melancholy",
+      "soft sadness",
+      "quiet thoughtfulness",
+      "mild wistfulness",
+      "peaceful sorrow",
+      "quiet devastation",
+      "tear-streaked sorrow",
+      "hollow emptiness",
+      "resigned melancholy",
+      "crumbling composure"
+    ],
+    "romantic_and_intimate": [
+      "gentle affection",
+      "soft warmth",
+      "tender expression",
+      "kind eyes",
+      "quiet fondness",
+      "lovestruck adoration",
+      "sultry seduction",
+      "tender vulnerability",
+      "playful flirtation",
+      "wistful longing"
+    ],
+    "contemplative_and_mysterious": [
+      "thoughtful expression",
+      "gentle curiosity",
+      "quiet concentration",
+      "soft introspection",
+      "peaceful contemplation",
+      "brooding intensity",
+      "knowing smirk",
+      "distant pensiveness",
+      "calculating assessment",
+      "enigmatic silence"
+    ]
+  }
 }
