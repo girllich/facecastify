@@ -3,10 +3,10 @@ interface GeminiResponse {
   textResponse?: string;
 }
 
-interface GeminiBatchResponse {
-  images?: string[];
-  textResponse?: string;
-}
+// interface GeminiBatchResponse {
+//   images?: string[];
+//   textResponse?: string;
+// }
 
 const API_KEY_STORAGE_KEY = 'gemini_api_key';
 
