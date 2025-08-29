@@ -19,7 +19,7 @@ const FacecastGenerator: React.FC = () => {
   const [results, setResults] = useState<ExpressionResult[]>([]);
   const [selectedExpressions, setSelectedExpressions] = useState<string[]>([]);
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
-  const [customPrompt, setCustomPrompt] = useState<string>('Make the character in the reference image have the following expression: {expression}. It\'s really important that you make significant changes to the expression, to make it look like an actor trying to EMOTE {expression}. Large scale emotions can even involve change of posture, the look in their eyes, their facial muscles, etc. Focus on the face and upper shoulders only, but otherwise try to replicate the reference image (colors, clothes, theme, age, setting) as closely as possible. The resulting image must be SQUARE format (1:1 aspect ratio)');
+  const [customPrompt, setCustomPrompt] = useState<string>('Make the character in the reference image have the following expression: {expression}. It\'s really important that you make a small but significant changes to the expression, to make it look like an actor trying to EMOTE {expression}. Large scale emotions can even involve change of posture, the look in their eyes, their facial muscles, etc. Focus on the face and upper shoulders only, but otherwise try to replicate the reference image (colors, clothes, theme, age, setting) as closely as possible. The resulting image must be SQUARE format (1:1 aspect ratio)');
   const [keepExistingImages, setKeepExistingImages] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
