@@ -186,6 +186,14 @@ const FacecastGenerator: React.FC = () => {
     setResults(prev => prev.filter((_, i) => i !== index));
   };
 
+  const handleGeneratedImageAdd = (imageData: string, description: string) => {
+    const generatedResult: ExpressionResult = {
+      expression: `Generated: ${description}`,
+      imageData: imageData
+    };
+    setResults(prev => [generatedResult, ...prev]);
+  };
+
   const zipAndLaunchGlowfic = async () => {
     const successfulResults = results.filter(r => r.imageData);
     if (successfulResults.length === 0) {
@@ -251,6 +259,7 @@ const FacecastGenerator: React.FC = () => {
                 onImageUpload={setReferenceImage}
                 currentImage={referenceImage}
                 disabled={isGenerating}
+                onGeneratedImageAdd={handleGeneratedImageAdd}
               />
             </div>
 

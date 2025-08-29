@@ -5,12 +5,14 @@ interface ImageUploadProps {
   onImageUpload: (imageData: string) => void;
   currentImage?: string;
   disabled?: boolean;
+  onGeneratedImageAdd?: (imageData: string, description: string) => void;
 }
 
 const ImageUpload: React.FC<ImageUploadProps> = ({ 
   onImageUpload, 
   currentImage,
-  disabled = false 
+  disabled = false,
+  onGeneratedImageAdd
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
@@ -125,6 +127,10 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
       
       if (imageData) {
         onImageUpload(imageData);
+        // Also add to results grid if callback is provided
+        if (onGeneratedImageAdd) {
+          onGeneratedImageAdd(imageData, characterDescription);
+        }
         setShowGenerateModal(false);
         console.log('Reference image generated successfully');
       } else {
