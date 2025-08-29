@@ -61,7 +61,7 @@ class GeminiService {
   
   async generateFacecast(referenceImageData: string, expression: string, customPrompt?: string): Promise<GeminiResponse> {
     try {
-      const modelName = 'models/gemini-2.0-flash-exp';
+      const modelName = 'models/gemini-2.5-flash-image-preview';
       
       if (!this.apiKey) {
         throw new Error("No Gemini API key available. Please provide an API key.");
@@ -70,7 +70,7 @@ class GeminiService {
       const base64Data = referenceImageData.split(',')[1];
       
       // Use custom prompt if provided, otherwise use default
-      const defaultPrompt = `Make the character in the reference image have the following expression: ${expression}. Focus on the face and upper shoulders only, but otherwise try to replicate the reference image (colors, clothes, theme, age, setting) as closely as possible.`;
+      const defaultPrompt = `Make the character in the reference image have the following expression: ${expression}. It's really important that you make significant changes to the expression, to make it look like an actor trying to EMOTE ${expression}. Large scale emotions can even involve change of posture, the look in their eyes, their facial muscles, etc. Focus on the face and upper shoulders only, but otherwise try to replicate the reference image (colors, clothes, theme, age, setting) as closely as possible. The resulting image must be SQUARE format (1:1 aspect ratio)`;
       const prompt = customPrompt ? customPrompt.replace('{expression}', expression) : defaultPrompt;
       
       const requestBody = {
@@ -140,6 +140,82 @@ class GeminiService {
       return geminiResponse;
     } catch (error) {
       console.error("Error generating facecast:", error);
+      throw error;
+    }
+  }
+
+  async generateImage(referenceImageData: string, prompt: string): Promise<string | null> {
+    try {
+      const modelName = 'models/gemini-2.5-flash-image-preview';
+      
+      if (!this.apiKey) {
+        throw new Error("No Gemini API key available. Please provide an API key.");
+      }
+
+      const parts: any[] = [{ text: prompt }];
+
+      // If reference image is provided, add it to the request
+      if (referenceImageData && referenceImageData.includes('base64,')) {
+        const base64Data = referenceImageData.split(',')[1];
+        parts.unshift({
+          inlineData: {
+            data: base64Data,
+            mimeType: "image/png"
+          }
+        });
+      }
+
+      const requestBody = {
+        contents: [
+          {
+            parts: parts,
+            role: "user"
+          }
+        ],
+        generationConfig: {
+          responseModalities: ["Image"],
+          temperature: 0.9
+        }
+      };
+      
+      const url = `https://generativelanguage.googleapis.com/v1beta/${modelName}:generateContent?key=${this.apiKey}`;
+      
+      const headers = {
+        'Content-Type': 'application/json',
+        'User-Agent': 'facecastify/1.0.0',
+        'x-goog-api-client': 'facecastify/1.0.0'
+      };
+      
+      console.log('Generating image with prompt:', prompt);
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(requestBody)
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+      }
+      
+      const result = await response.json();
+      
+      if (result.candidates && result.candidates.length > 0) {
+        const candidate = result.candidates[0];
+        if (candidate.content && candidate.content.parts) {
+          for (const part of candidate.content.parts) {
+            if (part.inlineData) {
+              return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+            }
+          }
+        }
+      }
+      
+      throw new Error("No image found in Gemini response");
+      
+    } catch (error) {
+      console.error("Error generating image:", error);
       throw error;
     }
   }

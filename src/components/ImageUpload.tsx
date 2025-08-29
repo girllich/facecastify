@@ -1,4 +1,5 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
+import GeminiService from '../services/GeminiService';
 
 interface ImageUploadProps {
   onImageUpload: (imageData: string) => void;
@@ -12,6 +13,10 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
   disabled = false 
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [characterDescription, setCharacterDescription] = useState('old woman with red hair');
+  const [generatePrompt, setGeneratePrompt] = useState('Create a portrait-style reference image of a {character}. The character should be an English character actor with an interesting, expressive face. The image should be square format (1:1 aspect ratio) and show the character from the head to upper shoulders. Focus on clear facial features suitable for generating expressions.');
+  const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
@@ -101,7 +106,105 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
     e.preventDefault();
   };
 
+  const generateReferenceImage = async () => {
+    if (!GeminiService.hasApiKey()) {
+      alert('Please provide a Gemini API key first');
+      return;
+    }
+
+    setIsGenerating(true);
+    
+    try {
+      // Replace {character} placeholder in prompt
+      const finalPrompt = generatePrompt.replace('{character}', characterDescription);
+      
+      console.log('Generating reference image with prompt:', finalPrompt);
+      
+      // Generate image using Gemini service
+      const imageData = await GeminiService.generateImage('', finalPrompt);
+      
+      if (imageData) {
+        onImageUpload(imageData);
+        setShowGenerateModal(false);
+        console.log('Reference image generated successfully');
+      } else {
+        throw new Error('No image data returned from Gemini');
+      }
+      
+    } catch (error) {
+      console.error('Error generating reference image:', error);
+      alert(`Error generating image: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   return (
+    <>
+      {/* Generate Modal */}
+      {showGenerateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Generate Reference Image</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Character Description
+                </label>
+                <input
+                  type="text"
+                  value={characterDescription}
+                  onChange={(e) => setCharacterDescription(e.target.value)}
+                  placeholder="e.g., old woman with red hair, young man with beard"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Generation Prompt
+                </label>
+                <textarea
+                  value={generatePrompt}
+                  onChange={(e) => setGeneratePrompt(e.target.value)}
+                  rows={4}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Use {"{character}"} as a placeholder for the character description
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={() => setShowGenerateModal(false)}
+                disabled={isGenerating}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={generateReferenceImage}
+                disabled={isGenerating || !characterDescription.trim()}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center space-x-2"
+              >
+                {isGenerating ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Generating...</span>
+                  </>
+                ) : (
+                  <span>Generate Image</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Main Upload Area */}
     <div className="space-y-4">
       <input
         ref={fileInputRef}
@@ -141,7 +244,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
               </svg>
             </div>
             <div>
-              <p className="text-gray-600 font-medium">Upload a reference image</p>
+              <p className="text-gray-600 font-medium">Upload or Generate Reference Image</p>
               <p className="text-sm text-gray-500">
                 Click to browse, drag and drop, or paste (Ctrl+V)
               </p>
@@ -149,7 +252,20 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
           </div>
         )}
       </div>
+      
+      {/* Generate Button */}
+      <div className="flex justify-center">
+        <button
+          onClick={() => setShowGenerateModal(true)}
+          disabled={disabled}
+          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center space-x-2"
+        >
+          <span>✨</span>
+          <span>Generate Reference Image</span>
+        </button>
+      </div>
     </div>
+    </>
   );
 };
 
