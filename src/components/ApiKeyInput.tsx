@@ -40,17 +40,29 @@ const ApiKeyInput: React.FC<ApiKeyInputProps> = ({ onApiKeySubmit }) => {
             {showKey ? '👁️' : '🙈'}
           </button>
         </div>
-        <p className="text-xs text-gray-500">
-          Get your API key from{' '}
-          <a 
-            href="https://makersuite.google.com/app/apikey" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="text-blue-600 hover:underline"
-          >
-            Google AI Studio
-          </a>
-        </p>
+        <div className="space-y-2">
+          <p className="text-xs text-gray-600 bg-green-50 p-2 rounded border border-green-200">
+            🔒 <strong>Privacy:</strong> Your API key is stored only in your browser's local storage and never leaves your device except for direct communication with Google's Gemini API.
+          </p>
+          <p className="text-xs text-gray-500">
+            <strong>How to get your API key:</strong>
+          </p>
+          <ol className="text-xs text-gray-500 ml-4 space-y-1">
+            <li>1. Go to the{' '}
+              <a 
+                href="https://makersuite.google.com/app/apikey" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:underline"
+              >
+                Google AI Console
+              </a>
+            </li>
+            <li>2. Sign in with your Google account</li>
+            <li>3. Click "Create API Key"</li>
+            <li>4. Copy the generated key and paste it above</li>
+          </ol>
+        </div>
       </div>
       <button
         type="submit"
