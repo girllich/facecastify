@@ -20,6 +20,7 @@ const FacecastGenerator: React.FC = () => {
   const [selectedExpressions, setSelectedExpressions] = useState<string[]>([]);
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
   const [customPrompt, setCustomPrompt] = useState<string>('Make the character in the reference image have the following expression: {expression}. It\'s really important that you make significant changes to the expression, to make it look like an actor trying to EMOTE {expression}. Large scale emotions can even involve change of posture, the look in their eyes, their facial muscles, etc. Focus on the face and upper shoulders only, but otherwise try to replicate the reference image (colors, clothes, theme, age, setting) as closely as possible. The resulting image must be SQUARE format (1:1 aspect ratio)');
+  const [keepExistingImages, setKeepExistingImages] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -136,7 +137,9 @@ const FacecastGenerator: React.FC = () => {
 
     setIsGenerating(true);
     setError(null);
-    setResults([]);
+    if (!keepExistingImages) {
+      setResults([]);
+    }
 
     try {
       console.log(`Starting generation of ${expressions.length} facecasts...`);
@@ -148,7 +151,11 @@ const FacecastGenerator: React.FC = () => {
         customPrompt
       );
 
-      setResults(batchResults);
+      if (keepExistingImages) {
+        setResults(prev => [...prev, ...batchResults]);
+      } else {
+        setResults(batchResults);
+      }
       console.log(`Generation complete: ${batchResults.filter(r => r.imageData).length}/${batchResults.length} successful`);
       
     } catch (error) {
@@ -173,6 +180,10 @@ const FacecastGenerator: React.FC = () => {
         document.body.removeChild(link);
       }, index * 100); // Small delay between downloads
     });
+  };
+
+  const handleDeleteImage = (index: number) => {
+    setResults(prev => prev.filter((_, i) => i !== index));
   };
 
   const zipAndLaunchGlowfic = async () => {
@@ -369,6 +380,23 @@ const FacecastGenerator: React.FC = () => {
                 <p className="text-sm text-gray-600 mb-4">
                   {expressionCount} expression{expressionCount !== 1 ? 's' : ''} selected
                 </p>
+                
+                <div className="mb-4">
+                  <label className="flex items-center space-x-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={keepExistingImages}
+                      onChange={(e) => setKeepExistingImages(e.target.checked)}
+                      disabled={isGenerating}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span>Keep existing images</span>
+                  </label>
+                  <p className="text-xs text-gray-500 mt-1 ml-6">
+                    When checked, new facecasts will be added to existing ones instead of replacing them
+                  </p>
+                </div>
+                
                 <button
                   onClick={generateFacecasts}
                   disabled={!referenceImage || isGenerating || expressionCount === 0}
@@ -417,6 +445,7 @@ const FacecastGenerator: React.FC = () => {
               <ExpressionGrid
                 results={results}
                 isGenerating={isGenerating}
+                onDelete={handleDeleteImage}
               />
             </div>
           </div>

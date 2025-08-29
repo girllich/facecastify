@@ -10,12 +10,14 @@ interface ExpressionGridProps {
   results: ExpressionResult[];
   isGenerating: boolean;
   onDownload?: (imageData: string, expression: string) => void;
+  onDelete?: (index: number) => void;
 }
 
 const ExpressionGrid: React.FC<ExpressionGridProps> = ({ 
   results, 
   isGenerating,
-  onDownload 
+  onDownload,
+  onDelete
 }) => {
   const handleDownload = (imageData: string, expression: string) => {
     if (onDownload) {
@@ -75,15 +77,30 @@ const ExpressionGrid: React.FC<ExpressionGridProps> = ({
                     alt={result.expression}
                     className="w-full h-full object-cover"
                   />
-                  <button
-                    onClick={() => handleDownload(result.imageData!, result.expression)}
-                    className="absolute top-2 right-2 p-2 bg-black bg-opacity-50 hover:bg-opacity-70 rounded-full text-white transition-opacity"
-                    title="Download image"
-                  >
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
-                    </svg>
-                  </button>
+                  <div className="absolute top-2 right-2 flex space-x-1">
+                    <button
+                      onClick={() => handleDownload(result.imageData!, result.expression)}
+                      className="p-2 bg-black bg-opacity-50 hover:bg-opacity-70 rounded-full text-white transition-opacity"
+                      title="Download image"
+                    >
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                    {onDelete && (
+                      <button
+                        onClick={() => onDelete(index)}
+                        className="p-2 bg-red-500 bg-opacity-70 hover:bg-opacity-90 rounded-full text-white transition-opacity"
+                        title="Delete image"
+                      >
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" clipRule="evenodd" />
+                          <path fillRule="evenodd" d="M10 5a2 2 0 00-2 2v6a2 2 0 104 0V7a2 2 0 00-2-2zM8 7v6h4V7H8z" clipRule="evenodd" />
+                          <path d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM4 6v10a2 2 0 002 2h8a2 2 0 002-2V6H4z" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
                 </>
               ) : result.error ? (
                 <div className="w-full h-full flex items-center justify-center text-red-500">
