@@ -182,6 +182,48 @@ const FacecastGenerator: React.FC = () => {
     });
   };
 
+  const resizeImage = (imageData: string, size: number): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        canvas.width = size;
+        canvas.height = size;
+        
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, size, size);
+          resolve(canvas.toDataURL('image/png'));
+        }
+      };
+      img.src = imageData;
+    });
+  };
+
+  const downloadAllResized = async () => {
+    const successfulResults = results.filter(r => r.imageData);
+    if (successfulResults.length === 0) return;
+
+    for (let i = 0; i < successfulResults.length; i++) {
+      const result = successfulResults[i];
+      try {
+        const resizedImageData = await resizeImage(result.imageData!, 150);
+        
+        setTimeout(() => {
+          const link = document.createElement('a');
+          link.href = resizedImageData;
+          link.download = `facecast-150x150-${result.expression.replace(/\s+/g, '-').toLowerCase()}.png`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }, i * 100); // Small delay between downloads
+      } catch (error) {
+        console.error(`Error resizing image for ${result.expression}:`, error);
+      }
+    }
+  };
+
   const handleDeleteImage = (index: number) => {
     setResults(prev => prev.filter((_, i) => i !== index));
   };
@@ -439,6 +481,13 @@ const FacecastGenerator: React.FC = () => {
                     className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed"
                   >
                     Download All ({results.filter(r => r.imageData).length})
+                  </button>
+                  <button
+                    onClick={downloadAllResized}
+                    disabled={results.filter(r => r.imageData).length === 0}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  >
+                    Download All (150x150) ({results.filter(r => r.imageData).length})
                   </button>
                   <button
                     onClick={zipAndLaunchGlowfic}
