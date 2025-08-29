@@ -88,6 +88,16 @@ const FacecastGenerator: React.FC = () => {
     setSelectedExpressions([]);
   };
 
+  const selectOnePerCategory = () => {
+    const onePerCategory: string[] = [];
+    Object.entries(expressionsData.actor_expressions).forEach(([category, expressions]) => {
+      if (expressions && expressions.length > 0) {
+        onePerCategory.push(expressions[0]);
+      }
+    });
+    setSelectedExpressions(onePerCategory);
+  };
+
   const isCategoryFullySelected = (category: string): boolean => {
     const categoryExpressions = expressionsData.actor_expressions[category as keyof typeof expressionsData.actor_expressions];
     if (!categoryExpressions) return false;
@@ -341,6 +351,14 @@ const FacecastGenerator: React.FC = () => {
                     disabled={isGenerating}
                   >
                     All
+                  </button>
+                  <span className="text-gray-400">|</span>
+                  <button
+                    onClick={selectOnePerCategory}
+                    className="text-purple-600 hover:underline"
+                    disabled={isGenerating}
+                  >
+                    One Per Category
                   </button>
                   <span className="text-gray-400">|</span>
                   <button
