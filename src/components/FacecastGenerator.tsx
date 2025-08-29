@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import GeminiService from '../services/GeminiService';
+import GlowficUploadService from '../services/GlowficUploadService';
 import ImageUpload from './ImageUpload';
 import ExpressionGrid from './ExpressionGrid';
 import ApiKeyInput from './ApiKeyInput';
@@ -172,6 +173,32 @@ const FacecastGenerator: React.FC = () => {
         document.body.removeChild(link);
       }, index * 100); // Small delay between downloads
     });
+  };
+
+  const zipAndLaunchGlowfic = async () => {
+    const successfulResults = results.filter(r => r.imageData);
+    if (successfulResults.length === 0) {
+      setError('No successful facecasts to upload');
+      return;
+    }
+
+    try {
+      setError(null);
+      console.log(`Creating zip with ${successfulResults.length} facecasts...`);
+      
+      // Create timestamp for unique filename
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const zipFilename = `facecasts-${timestamp}.glowficgirllichgallery`;
+      
+      // Create zip, download, and launch app
+      await GlowficUploadService.zipDownloadAndLaunch(successfulResults, zipFilename);
+      
+      console.log('Successfully created zip and launched Glowfic Gallery Manager!');
+      
+    } catch (error) {
+      console.error('Error in zip/launch workflow:', error);
+      setError(`Error preparing upload: ${error instanceof Error ? error.message : String(error)}`);
+    }
   };
 
   const expressionCount = getAllExpressions().length;
@@ -368,13 +395,21 @@ const FacecastGenerator: React.FC = () => {
           <div className="lg:col-span-2">
             <div className="bg-white rounded-lg shadow-md p-6">
               {results.length > 0 && (
-                <div className="mb-4 flex justify-end">
+                <div className="mb-4 flex justify-end space-x-3">
                   <button
                     onClick={downloadAll}
                     disabled={results.filter(r => r.imageData).length === 0}
                     className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed"
                   >
                     Download All ({results.filter(r => r.imageData).length})
+                  </button>
+                  <button
+                    onClick={zipAndLaunchGlowfic}
+                    disabled={results.filter(r => r.imageData).length === 0}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center space-x-2"
+                  >
+                    <span>📤</span>
+                    <span>Upload to Glowfic ({results.filter(r => r.imageData).length})</span>
                   </button>
                 </div>
               )}

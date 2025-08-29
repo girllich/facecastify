@@ -686,17 +686,22 @@ class IconWidget(QLabel):
 class GlowficGUI(QMainWindow):
     """Main GUI window for Glowfic gallery management"""
     
-    def __init__(self, scraper):
+    def __init__(self, scraper, initial_file=None):
         super().__init__()
         self.scraper = scraper
         self.current_gallery_id = None
         self.upload_worker = None
+        self.pending_files = []
         
         self.setWindowTitle("Glowfic Gallery Manager")
         self.setGeometry(100, 100, 1200, 800)
         
         self.setup_ui()
         self.load_galleries()
+        
+        # Handle initial file if provided
+        if initial_file:
+            self.load_glowfic_file(initial_file)
     
     def setup_ui(self):
         """Set up the user interface"""
@@ -794,6 +799,19 @@ class GlowficGUI(QMainWindow):
         
         # Load gallery icons
         self.load_gallery_icons(gallery['id'])
+        
+        # If we have pending files from a loaded .glowficgirllichgallery file, offer to upload
+        if self.pending_files:
+            reply = QMessageBox.question(
+                self, 
+                "Upload Images?", 
+                f"Upload {len(self.pending_files)} images to gallery '{gallery['name']}'?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            
+            if reply == QMessageBox.StandardButton.Yes:
+                self.on_files_dropped(self.pending_files)
+                self.pending_files = []  # Clear after upload
     
     def load_gallery_icons(self, gallery_id):
         """Load icons for the selected gallery"""
@@ -867,6 +885,48 @@ class GlowficGUI(QMainWindow):
                 self.load_gallery_icons(self.current_gallery_id)
             # Refresh gallery list to update icon counts
             self.load_galleries()
+    
+    def load_glowfic_file(self, file_path):
+        """Load and extract a .glowficgirllichgallery file"""
+        try:
+            if not os.path.exists(file_path):
+                QMessageBox.warning(self, "File Not Found", f"Could not find file: {file_path}")
+                return
+            
+            # Extract images from the zip file
+            extracted_files = []
+            temp_dir = tempfile.mkdtemp()
+            
+            with zipfile.ZipFile(file_path, 'r') as zip_ref:
+                for file_info in zip_ref.filelist:
+                    if file_info.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')):
+                        extracted_path = zip_ref.extract(file_info, temp_dir)
+                        extracted_files.append(extracted_path)
+            
+            if extracted_files:
+                self.pending_files = extracted_files
+                
+                # Update drop area to show loaded files
+                file_count = len(extracted_files)
+                self.drop_area.label.setText(f"✓ Loaded {file_count} images from {os.path.basename(file_path)}\nSelect a gallery to upload to")
+                self.drop_area.setStyleSheet("""
+                    QFrame {
+                        border: 2px solid #4CAF50;
+                        border-radius: 10px;
+                        background-color: #f0f8f0;
+                        min-height: 150px;
+                    }
+                """)
+                
+                # Show progress message
+                self.progress_text.append(f"📁 Loaded {file_count} images from {os.path.basename(file_path)}")
+                self.progress_text.append("👈 Select a gallery from the left panel to upload to")
+                
+            else:
+                QMessageBox.warning(self, "No Images Found", f"No image files found in {os.path.basename(file_path)}")
+                
+        except Exception as e:
+            QMessageBox.critical(self, "Error Loading File", f"Failed to load {os.path.basename(file_path)}:\n{e}")
 
 class LoginDialog(QDialog):
     """Login dialog for credentials"""
@@ -1028,18 +1088,114 @@ MimeType=x-scheme-handler/{scheme};
 def register_url_handler_windows(script_path, scheme):
     """Register URL handler on Windows using registry"""
     print(f"Windows URL handler registration for {scheme}:// not yet implemented")
-    print("To register manually on Windows:")
-    print(f'1. Run: reg add "HKEY_CLASSES_ROOT\\{scheme}" /ve /d "Glowfic Gallery Handler"')
-    print(f'2. Run: reg add "HKEY_CLASSES_ROOT\\{scheme}\\shell\\open\\command" /ve /d "\\"{script_path}\\" --gui \\"%1\\""')
-    print(f'3. Run: reg add "HKEY_CLASSES_ROOT\\{scheme}" /v "URL Protocol" /t REG_SZ /d ""')
+    print("To register manually on Windows, run these commands as Administrator:")
+    print(f'1. reg add "HKEY_CLASSES_ROOT\\{scheme}" /ve /d "Glowfic Gallery Handler"')
+    print(f'2. reg add "HKEY_CLASSES_ROOT\\{scheme}\\shell\\open\\command" /ve /d "\\"{script_path}\\" --gui \\"%1\\""')
+    print(f'3. reg add "HKEY_CLASSES_ROOT\\{scheme}" /v "URL Protocol" /t REG_SZ /d ""')
     return False
 
 def register_url_handler_macos(script_path, scheme):
-    """Register URL handler on macOS using LSSetDefaultHandlerForURLScheme"""
+    """Register URL handler on macOS using LSSetDefaultHandlerForURLScheme"""  
     print(f"macOS URL handler registration for {scheme}:// not yet implemented")
     print("To register manually on macOS:")
     print("1. Create an .app bundle with Info.plist containing CFBundleURLSchemes")
-    print(f"2. Register with: defaults write com.apple.LaunchServices LSHandlers -array-add '{{LSHandlerURLScheme={scheme};LSHandlerRoleAll=com.yourapp.glowfic;}}'")
+    print(f"2. defaults write com.apple.LaunchServices LSHandlers -array-add '{{LSHandlerURLScheme={scheme};LSHandlerRoleAll=com.yourapp.glowfic;}}'")
+    print("3. /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister -kill -r -domain local -domain system -domain user")
+    return False
+
+def register_file_handler():
+    """Register .glowficgirllichgallery file association cross-platform"""
+    script_path = os.path.abspath(__file__)
+    extension = "glowficgirllichgallery"
+    
+    system = platform.system()
+    
+    if system == "Linux":
+        return register_file_handler_linux(script_path, extension)
+    elif system == "Windows":
+        return register_file_handler_windows(script_path, extension)
+    elif system == "Darwin":  # macOS
+        return register_file_handler_macos(script_path, extension)
+    else:
+        print(f"File handler registration not supported on {system}")
+        return False
+
+def register_file_handler_linux(script_path, extension):
+    """Register file association on Linux"""
+    try:
+        # Create MIME type
+        mime_type = f"application/x-{extension}"
+        
+        # Create desktop file for file association
+        desktop_content = f"""[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Glowfic Gallery File Handler
+Comment=Open .{extension} files with Glowfic Gallery Manager
+Exec={script_path} --gui %f
+Icon=glowfic-gallery-manager
+NoDisplay=true
+StartupNotify=true
+MimeType={mime_type};
+"""
+        
+        # Write desktop file
+        apps_dir = os.path.expanduser("~/.local/share/applications")
+        os.makedirs(apps_dir, exist_ok=True)
+        
+        desktop_file = os.path.join(apps_dir, "glowfic-file-handler.desktop")
+        with open(desktop_file, 'w') as f:
+            f.write(desktop_content)
+        
+        os.chmod(desktop_file, 0o755)
+        
+        # Create MIME type definition
+        mime_dir = os.path.expanduser("~/.local/share/mime/packages")
+        os.makedirs(mime_dir, exist_ok=True)
+        
+        mime_content = f"""<?xml version="1.0" encoding="UTF-8"?>
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="{mime_type}">
+    <comment>Glowfic Gallery Package</comment>
+    <glob pattern="*.{extension}"/>
+  </mime-type>
+</mime-info>
+"""
+        
+        mime_file = os.path.join(mime_dir, f"{extension}.xml")
+        with open(mime_file, 'w') as f:
+            f.write(mime_content)
+        
+        # Update MIME database
+        subprocess.run(["update-mime-database", os.path.expanduser("~/.local/share/mime")], 
+                      capture_output=True)
+        
+        # Associate file type with application
+        subprocess.run(["xdg-mime", "default", "glowfic-file-handler.desktop", mime_type], 
+                      capture_output=True)
+        
+        print(f"Successfully registered .{extension} file association on Linux")
+        return True
+        
+    except Exception as e:
+        print(f"Error registering Linux file handler: {e}")
+        return False
+
+def register_file_handler_windows(script_path, extension):
+    """Register file association on Windows"""
+    print(f"Windows file association for .{extension} not yet implemented")
+    print("To register manually on Windows, run as Administrator:")
+    print(f'1. reg add "HKEY_CLASSES_ROOT\\.{extension}" /ve /d "GlowficGalleryFile"')
+    print(f'2. reg add "HKEY_CLASSES_ROOT\\GlowficGalleryFile" /ve /d "Glowfic Gallery Package"')
+    print(f'3. reg add "HKEY_CLASSES_ROOT\\GlowficGalleryFile\\shell\\open\\command" /ve /d "\\"{script_path}\\" --gui \\"%1\\""')
+    return False
+
+def register_file_handler_macos(script_path, extension):
+    """Register file association on macOS"""
+    print(f"macOS file association for .{extension} not yet implemented")
+    print("To register manually on macOS:")
+    print("1. Create .app bundle with Info.plist containing CFBundleDocumentTypes")
+    print(f"2. Add file extension .{extension} to CFBundleTypeExtensions")
     print("3. Run: /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister -kill -r -domain local -domain system -domain user")
     return False
 
@@ -1080,13 +1236,19 @@ S3 upload, and gallery management through the Glowfic API.
                        help='Launch graphical user interface')
     parser.add_argument('--register-handler', action='store_true',
                        help='Register glowficgirlichgallery:// URL scheme handler')
+    parser.add_argument('--register-files', action='store_true',
+                       help='Register .glowficgirllichgallery file association')
+    parser.add_argument('--register-all', action='store_true',
+                       help='Register both URL scheme and file association')
+    parser.add_argument('file', nargs='?',
+                       help='Glowfic gallery file to open (.glowficgirllichgallery)')
     
     args = parser.parse_args()
     
     # Load environment variables from .env file
     load_dotenv()
     
-    # Handle URL handler registration (doesn't need scraper)
+    # Handle registrations (doesn't need scraper)
     if args.register_handler:
         success = register_url_handler()
         if success:
@@ -1096,10 +1258,35 @@ S3 upload, and gallery management through the Glowfic API.
             print("URL handler registration failed or not supported")
         return
     
+    if args.register_files:
+        success = register_file_handler()
+        if success:
+            print("File handler registered successfully!")
+            print("You can now double-click .glowficgirllichgallery files to open them")
+        else:
+            print("File handler registration failed or not supported")
+        return
+    
+    if args.register_all:
+        url_success = register_url_handler()
+        file_success = register_file_handler()
+        
+        if url_success and file_success:
+            print("Both handlers registered successfully!")
+            print("✓ URL scheme: glowficgirlichgallery://")
+            print("✓ File type: .glowficgirllichgallery")
+        elif url_success:
+            print("URL handler registered, but file handler failed")
+        elif file_success:
+            print("File handler registered, but URL handler failed")
+        else:
+            print("Both registrations failed or not supported")
+        return
+    
     scraper = GlowficScraper()
     
-    # Handle GUI launch
-    if args.gui:
+    # Handle GUI launch (including file opening)
+    if args.gui or args.file:
         load_dotenv()
         
         # Try to load existing cookies
@@ -1124,7 +1311,7 @@ S3 upload, and gallery management through the Glowfic API.
         if not app:
             app = QApplication(sys.argv)
         
-        window = GlowficGUI(scraper)
+        window = GlowficGUI(scraper, args.file)
         window.show()
         sys.exit(app.exec())
     
