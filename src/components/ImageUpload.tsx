@@ -258,7 +258,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
         <button
           onClick={() => setShowGenerateModal(true)}
           disabled={disabled}
-          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center space-x-2"
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center space-x-2"
         >
           <span>✨</span>
           <span>Generate Reference Image</span>
