@@ -236,6 +236,10 @@ const FacecastGenerator: React.FC = () => {
     setResults(prev => [generatedResult, ...prev]);
   };
 
+  const clearAllResults = () => {
+    setResults([]);
+  };
+
   const zipAndLaunchGlowfic = async () => {
     const successfulResults = results.filter(r => r.imageData);
     if (successfulResults.length === 0) {
@@ -475,6 +479,12 @@ const FacecastGenerator: React.FC = () => {
             <div className="bg-white rounded-lg shadow-md p-6">
               {results.length > 0 && (
                 <div className="mb-4 flex justify-end space-x-3">
+                  <button
+                    onClick={clearAllResults}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+                  >
+                    Clear All
+                  </button>
                   <button
                     onClick={downloadAll}
                     disabled={results.filter(r => r.imageData).length === 0}

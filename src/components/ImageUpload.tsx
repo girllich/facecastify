@@ -17,7 +17,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [characterDescription, setCharacterDescription] = useState('old woman with red hair');
-  const [generatePrompt, setGeneratePrompt] = useState('Create a portrait-style reference image of a {character}. The character should be an English character actor with an interesting, expressive face. The image should be square format (1:1 aspect ratio) and show the character from the head to upper shoulders. Focus on clear facial features suitable for generating expressions.');
+  const [generatePrompt, setGeneratePrompt] = useState('Create a portrait-style reference image of a {character}. The character should be an English character actor with an interesting, expressive face. The image should be square format (1:1 aspect ratio) and show the character from the head to upper shoulders. Focus on clear facial features suitable for generating expressions. The character should have a neutral, relaxed expression - not smiling, not frowning, just a calm, natural look.');
   const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
