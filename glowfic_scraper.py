@@ -33,6 +33,8 @@ from urllib.parse import urljoin
 from dotenv import load_dotenv
 from PIL import Image
 from io import BytesIO
+import platform
+import subprocess
 
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, 
                             QWidget, QListWidget, QListWidgetItem, QLabel, QScrollArea,
@@ -962,6 +964,85 @@ def get_credentials_for_gui():
     
     return None, None
 
+def register_url_handler():
+    """Register glowficgirlichgallery:// URL scheme handler cross-platform"""
+    script_path = os.path.abspath(__file__)
+    scheme = "glowficgirlichgallery"
+    
+    system = platform.system()
+    
+    if system == "Linux":
+        return register_url_handler_linux(script_path, scheme)
+    elif system == "Windows":
+        return register_url_handler_windows(script_path, scheme)
+    elif system == "Darwin":  # macOS
+        return register_url_handler_macos(script_path, scheme)
+    else:
+        print(f"URL handler registration not supported on {system}")
+        return False
+
+def register_url_handler_linux(script_path, scheme):
+    """Register URL handler on Linux using xdg-settings"""
+    try:
+        # Create desktop file content
+        desktop_content = f"""[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Glowfic Gallery Handler
+Comment=Handle {scheme}:// URLs and launch gallery manager
+Exec={script_path} --gui %u
+Icon=glowfic-gallery-manager
+NoDisplay=true
+StartupNotify=true
+MimeType=x-scheme-handler/{scheme};
+"""
+        
+        # Write to user applications directory
+        apps_dir = os.path.expanduser("~/.local/share/applications")
+        os.makedirs(apps_dir, exist_ok=True)
+        
+        desktop_file = os.path.join(apps_dir, "glowfic-handler.desktop")
+        with open(desktop_file, 'w') as f:
+            f.write(desktop_content)
+        
+        # Make executable
+        os.chmod(desktop_file, 0o755)
+        
+        # Register with xdg-settings
+        result = subprocess.run([
+            "xdg-settings", "set", "default-url-scheme-handler", 
+            scheme, "glowfic-handler.desktop"
+        ], capture_output=True, text=True)
+        
+        if result.returncode == 0:
+            print(f"Successfully registered {scheme}:// URL handler on Linux")
+            return True
+        else:
+            print(f"Failed to register URL handler: {result.stderr}")
+            return False
+            
+    except Exception as e:
+        print(f"Error registering Linux URL handler: {e}")
+        return False
+
+def register_url_handler_windows(script_path, scheme):
+    """Register URL handler on Windows using registry"""
+    print(f"Windows URL handler registration for {scheme}:// not yet implemented")
+    print("To register manually on Windows:")
+    print(f'1. Run: reg add "HKEY_CLASSES_ROOT\\{scheme}" /ve /d "Glowfic Gallery Handler"')
+    print(f'2. Run: reg add "HKEY_CLASSES_ROOT\\{scheme}\\shell\\open\\command" /ve /d "\\"{script_path}\\" --gui \\"%1\\""')
+    print(f'3. Run: reg add "HKEY_CLASSES_ROOT\\{scheme}" /v "URL Protocol" /t REG_SZ /d ""')
+    return False
+
+def register_url_handler_macos(script_path, scheme):
+    """Register URL handler on macOS using LSSetDefaultHandlerForURLScheme"""
+    print(f"macOS URL handler registration for {scheme}:// not yet implemented")
+    print("To register manually on macOS:")
+    print("1. Create an .app bundle with Info.plist containing CFBundleURLSchemes")
+    print(f"2. Register with: defaults write com.apple.LaunchServices LSHandlers -array-add '{{LSHandlerURLScheme={scheme};LSHandlerRoleAll=com.yourapp.glowfic;}}'")
+    print("3. Run: /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister -kill -r -domain local -domain system -domain user")
+    return False
+
 def main():
     # Parse command line arguments
     parser = argparse.ArgumentParser(
@@ -997,11 +1078,23 @@ S3 upload, and gallery management through the Glowfic API.
                        help='Resize image to 150x150 and save locally (requires --upload)')
     parser.add_argument('--gui', action='store_true',
                        help='Launch graphical user interface')
+    parser.add_argument('--register-handler', action='store_true',
+                       help='Register glowficgirlichgallery:// URL scheme handler')
     
     args = parser.parse_args()
     
     # Load environment variables from .env file
     load_dotenv()
+    
+    # Handle URL handler registration (doesn't need scraper)
+    if args.register_handler:
+        success = register_url_handler()
+        if success:
+            print("URL handler registered successfully!")
+            print("You can now use glowficgirlichgallery:// URLs in browsers")
+        else:
+            print("URL handler registration failed or not supported")
+        return
     
     scraper = GlowficScraper()
     
