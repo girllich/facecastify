@@ -29,6 +29,7 @@ import string
 import zipfile
 import threading
 import xml.etree.ElementTree as ET
+from datetime import datetime
 from urllib.parse import urljoin
 from dotenv import load_dotenv
 from PIL import Image
@@ -198,6 +199,38 @@ class GlowficScraper:
             print(f"Cookies saved to {filename}")
         except Exception as e:
             print(f"Error saving cookies: {e}")
+    
+    def check_and_register_handlers(self):
+        """Check if handlers are registered and register them if not"""
+        registration_file = os.path.expanduser("~/.config/glowfic_registered")
+        
+        if not os.path.exists(registration_file):
+            print("First time setup - registering file handlers...")
+            
+            # Create config directory
+            config_dir = os.path.dirname(registration_file)
+            os.makedirs(config_dir, exist_ok=True)
+            
+            # Register both handlers
+            url_success = register_url_handler()
+            file_success = register_file_handler()
+            
+            # Mark as registered
+            with open(registration_file, 'w') as f:
+                json.dump({
+                    'url_handler': url_success,
+                    'file_handler': file_success,
+                    'registered_at': str(datetime.now())
+                }, f)
+            
+            if url_success and file_success:
+                print("✓ Registered URL scheme and file association")
+            elif url_success or file_success:
+                print("⚠ Partial registration completed")
+            else:
+                print("✗ Handler registration failed")
+        
+        return True
     
     def load_cookies(self, filename='glowfic_cookies.json'):
         """Load session cookies from file"""
@@ -1305,6 +1338,9 @@ S3 upload, and gallery management through the Glowfic API.
                 return
             
             scraper.save_cookies()
+            
+            # Auto-register handlers on first successful login
+            scraper.check_and_register_handlers()
         
         # Launch GUI
         app = QApplication.instance()
@@ -1374,6 +1410,9 @@ S3 upload, and gallery management through the Glowfic API.
         # Attempt login
         if scraper.login(username, password, remember_me):
             scraper.save_cookies()
+            
+            # Auto-register handlers on first successful login
+            scraper.check_and_register_handlers()
             
             # Get user info
             user_info = scraper.get_user_info()

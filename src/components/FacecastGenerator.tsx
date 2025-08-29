@@ -19,7 +19,7 @@ const FacecastGenerator: React.FC = () => {
   const [results, setResults] = useState<ExpressionResult[]>([]);
   const [selectedExpressions, setSelectedExpressions] = useState<string[]>([]);
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
-  const [customPrompt, setCustomPrompt] = useState<string>('Make the character in the reference image have the following expression: {expression}. Focus on the face and upper shoulders only, but otherwise try to replicate the reference image (colors, clothes, theme, age, setting) as closely as possible.');
+  const [customPrompt, setCustomPrompt] = useState<string>('Make the character in the reference image have the following expression: {expression}. Focus on the face and upper shoulders only, but otherwise try to replicate the reference image (colors, clothes, theme, age, setting) as closely as possible. The resulting image must be SQUARE format (1:1 aspect ratio).');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
