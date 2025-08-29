@@ -7,6 +7,8 @@
 #     "lxml>=4.6.0",
 #     "python-dotenv>=0.19.0",
 #     "pillow>=8.0.0",
+#     "PyQt6>=6.0.0",
+#     "keyring>=23.0.0",
 # ]
 # ///
 """
@@ -24,11 +26,21 @@ import argparse
 import tempfile
 import random
 import string
+import zipfile
+import threading
 import xml.etree.ElementTree as ET
 from urllib.parse import urljoin
 from dotenv import load_dotenv
 from PIL import Image
 from io import BytesIO
+
+from PyQt6.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, 
+                            QWidget, QListWidget, QListWidgetItem, QLabel, QScrollArea,
+                            QGridLayout, QProgressBar, QTextEdit, QPushButton, QSplitter,
+                            QFrame, QMessageBox, QDialog, QLineEdit, QCheckBox, QFormLayout)
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QMimeData
+from PyQt6.QtGui import QPixmap, QDragEnterEvent, QDropEvent, QFont
+import keyring
 
 class GlowficScraper:
     def __init__(self):
@@ -510,23 +522,518 @@ class GlowficScraper:
             print(f"Error uploading icon: {e}")
             return False
 
+class UploadWorker(QThread):
+    """Worker thread for uploading files without blocking the UI"""
+    progress = pyqtSignal(str)
+    finished = pyqtSignal(bool, str)
+    
+    def __init__(self, scraper, gallery_id, files):
+        super().__init__()
+        self.scraper = scraper
+        self.gallery_id = gallery_id
+        self.files = files
+    
+    def run(self):
+        """Upload files in background thread"""
+        success_count = 0
+        for i, file_path in enumerate(self.files, 1):
+            try:
+                filename = os.path.basename(file_path)
+                self.progress.emit(f"Uploading {i}/{len(self.files)}: {filename}")
+                
+                # Use filename without extension as keyword
+                keyword = os.path.splitext(filename)[0]
+                
+                result = self.scraper.upload_icon_to_gallery(
+                    gallery_id=self.gallery_id,
+                    image_path=file_path,
+                    keyword=keyword,
+                    save_response=False
+                )
+                
+                if result:
+                    success_count += 1
+                    self.progress.emit(f"✓ Uploaded: {filename}")
+                else:
+                    self.progress.emit(f"✗ Failed: {filename}")
+                    
+            except Exception as e:
+                self.progress.emit(f"✗ Error uploading {filename}: {e}")
+        
+        self.finished.emit(success_count == len(self.files), 
+                          f"Completed: {success_count}/{len(self.files)} successful")
+
+class DropArea(QFrame):
+    """Drag and drop area for image files and zip files"""
+    filesDropped = pyqtSignal(list)
+    
+    def __init__(self):
+        super().__init__()
+        self.setAcceptDrops(True)
+        self.setFrameStyle(QFrame.Shape.Box)
+        self.setStyleSheet("""
+            QFrame {
+                border: 2px dashed #aaa;
+                border-radius: 10px;
+                background-color: #f9f9f9;
+                min-height: 150px;
+            }
+            QFrame:hover {
+                border-color: #2B5797;
+                background-color: #f0f8ff;
+            }
+        """)
+        
+        layout = QVBoxLayout()
+        
+        self.label = QLabel("Drop images or zip files here")
+        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        font = QFont()
+        font.setPointSize(14)
+        self.label.setFont(font)
+        self.label.setStyleSheet("color: #666; margin: 20px;")
+        
+        layout.addWidget(self.label)
+        self.setLayout(layout)
+    
+    def dragEnterEvent(self, event: QDragEnterEvent):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+    
+    def dropEvent(self, event: QDropEvent):
+        files = []
+        for url in event.mimeData().urls():
+            file_path = url.toLocalFile()
+            if os.path.isfile(file_path):
+                if file_path.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')):
+                    files.append(file_path)
+                elif file_path.lower().endswith('.zip'):
+                    # Extract images from zip
+                    extracted = self.extract_images_from_zip(file_path)
+                    files.extend(extracted)
+        
+        if files:
+            self.filesDropped.emit(files)
+    
+    def extract_images_from_zip(self, zip_path):
+        """Extract image files from a zip archive"""
+        extracted_files = []
+        try:
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                for file_info in zip_ref.filelist:
+                    if file_info.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')):
+                        # Extract to temp directory
+                        temp_dir = tempfile.mkdtemp()
+                        extracted_path = zip_ref.extract(file_info, temp_dir)
+                        extracted_files.append(extracted_path)
+        except Exception as e:
+            print(f"Error extracting zip: {e}")
+        
+        return extracted_files
+
+class IconWidget(QLabel):
+    """Widget to display a single icon"""
+    def __init__(self, icon_url, keyword):
+        super().__init__()
+        self.setFixedSize(160, 180)
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setFrameStyle(QFrame.Shape.Box)
+        self.setStyleSheet("border: 1px solid #ddd; margin: 5px; background: white;")
+        
+        layout = QVBoxLayout()
+        
+        # Icon image
+        self.icon_label = QLabel()
+        self.icon_label.setFixedSize(150, 150)
+        self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.icon_label.setStyleSheet("border: none; background: #f5f5f5;")
+        
+        # Load image from URL
+        self.load_image(icon_url)
+        
+        # Keyword label
+        keyword_label = QLabel(keyword)
+        keyword_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        keyword_label.setWordWrap(True)
+        keyword_label.setMaximumHeight(20)
+        keyword_label.setStyleSheet("border: none; font-size: 10px; color: #666;")
+        
+        layout.addWidget(self.icon_label)
+        layout.addWidget(keyword_label)
+        layout.setContentsMargins(5, 5, 5, 5)
+        self.setLayout(layout)
+    
+    def load_image(self, url):
+        """Load image from URL"""
+        try:
+            response = requests.get(url, timeout=5)
+            if response.status_code == 200:
+                pixmap = QPixmap()
+                pixmap.loadFromData(response.content)
+                if not pixmap.isNull():
+                    scaled_pixmap = pixmap.scaled(150, 150, Qt.AspectRatioMode.KeepAspectRatio, 
+                                                Qt.TransformationMode.SmoothTransformation)
+                    self.icon_label.setPixmap(scaled_pixmap)
+                else:
+                    self.icon_label.setText("Invalid Image")
+            else:
+                self.icon_label.setText("Failed to Load")
+        except Exception as e:
+            self.icon_label.setText("Load Error")
+
+class GlowficGUI(QMainWindow):
+    """Main GUI window for Glowfic gallery management"""
+    
+    def __init__(self, scraper):
+        super().__init__()
+        self.scraper = scraper
+        self.current_gallery_id = None
+        self.upload_worker = None
+        
+        self.setWindowTitle("Glowfic Gallery Manager")
+        self.setGeometry(100, 100, 1200, 800)
+        
+        self.setup_ui()
+        self.load_galleries()
+    
+    def setup_ui(self):
+        """Set up the user interface"""
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        
+        # Main horizontal splitter
+        main_splitter = QSplitter(Qt.Orientation.Horizontal)
+        
+        # Left panel: Gallery list
+        left_panel = QWidget()
+        left_layout = QVBoxLayout()
+        
+        gallery_label = QLabel("Galleries")
+        gallery_label.setStyleSheet("font-size: 16px; font-weight: bold; margin: 10px;")
+        
+        self.gallery_list = QListWidget()
+        self.gallery_list.itemClicked.connect(self.on_gallery_selected)
+        
+        left_layout.addWidget(gallery_label)
+        left_layout.addWidget(self.gallery_list)
+        left_panel.setLayout(left_layout)
+        
+        # Right panel: Icons and upload area
+        right_panel = QWidget()
+        right_layout = QVBoxLayout()
+        
+        # Gallery title
+        self.gallery_title = QLabel("Select a gallery")
+        self.gallery_title.setStyleSheet("font-size: 14px; font-weight: bold; margin: 10px;")
+        
+        # Icons scroll area
+        self.icons_scroll = QScrollArea()
+        self.icons_scroll.setWidgetResizable(True)
+        self.icons_widget = QWidget()
+        self.icons_layout = QGridLayout()
+        self.icons_widget.setLayout(self.icons_layout)
+        self.icons_scroll.setWidget(self.icons_widget)
+        
+        # Upload area
+        upload_label = QLabel("Upload Area")
+        upload_label.setStyleSheet("font-size: 14px; font-weight: bold; margin: 10px;")
+        
+        self.drop_area = DropArea()
+        self.drop_area.filesDropped.connect(self.on_files_dropped)
+        
+        # Progress area
+        self.progress_text = QTextEdit()
+        self.progress_text.setMaximumHeight(150)
+        self.progress_text.setStyleSheet("background: #f9f9f9; border: 1px solid #ddd;")
+        
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setVisible(False)
+        
+        # Add to right layout
+        right_layout.addWidget(self.gallery_title)
+        right_layout.addWidget(self.icons_scroll, 1)  # Give icons area most space
+        right_layout.addWidget(upload_label)
+        right_layout.addWidget(self.drop_area)
+        right_layout.addWidget(QLabel("Upload Progress:"))
+        right_layout.addWidget(self.progress_text)
+        right_layout.addWidget(self.progress_bar)
+        
+        right_panel.setLayout(right_layout)
+        
+        # Add panels to splitter
+        main_splitter.addWidget(left_panel)
+        main_splitter.addWidget(right_panel)
+        main_splitter.setSizes([300, 900])  # Left panel smaller
+        
+        # Main layout
+        main_layout = QHBoxLayout()
+        main_layout.addWidget(main_splitter)
+        central_widget.setLayout(main_layout)
+    
+    def load_galleries(self):
+        """Load user galleries into the list"""
+        try:
+            galleries = self.scraper.get_user_galleries()
+            if galleries:
+                self.gallery_list.clear()
+                for gallery in galleries:
+                    item_text = f"{gallery['name']} ({gallery['icon_count']} icons)"
+                    item = QListWidgetItem(item_text)
+                    item.setData(Qt.ItemDataRole.UserRole, gallery)
+                    self.gallery_list.addItem(item)
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Failed to load galleries: {e}")
+    
+    def on_gallery_selected(self, item):
+        """Handle gallery selection"""
+        gallery = item.data(Qt.ItemDataRole.UserRole)
+        self.current_gallery_id = gallery['id']
+        self.gallery_title.setText(f"Gallery: {gallery['name']} ({gallery['icon_count']} icons)")
+        
+        # Load gallery icons
+        self.load_gallery_icons(gallery['id'])
+    
+    def load_gallery_icons(self, gallery_id):
+        """Load icons for the selected gallery"""
+        try:
+            # Clear existing icons
+            for i in reversed(range(self.icons_layout.count())):
+                self.icons_layout.itemAt(i).widget().setParent(None)
+            
+            # Get gallery page
+            content = self.scraper.scrape_page(f"/galleries/{gallery_id}")
+            if content:
+                soup = BeautifulSoup(content.decode('utf-8'), 'html.parser')
+                
+                # Find all gallery icons
+                icon_divs = soup.find_all('div', class_='gallery-icon')
+                
+                row, col = 0, 0
+                for icon_div in icon_divs:
+                    img_tag = icon_div.find('img', class_='icon')
+                    keyword_span = icon_div.find('span', class_='icon-keyword')
+                    
+                    if img_tag and keyword_span:
+                        icon_url = img_tag.get('src', '')
+                        keyword = keyword_span.get_text().strip()
+                        
+                        icon_widget = IconWidget(icon_url, keyword)
+                        self.icons_layout.addWidget(icon_widget, row, col)
+                        
+                        col += 1
+                        if col >= 6:  # 6 icons per row
+                            col = 0
+                            row += 1
+                            
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Failed to load gallery icons: {e}")
+    
+    def on_files_dropped(self, files):
+        """Handle dropped files"""
+        if not self.current_gallery_id:
+            QMessageBox.warning(self, "No Gallery Selected", "Please select a gallery first")
+            return
+        
+        if not files:
+            return
+        
+        # Show progress
+        self.progress_bar.setVisible(True)
+        self.progress_bar.setRange(0, 0)  # Indeterminate
+        self.progress_text.clear()
+        self.progress_text.append(f"Preparing to upload {len(files)} files to gallery {self.current_gallery_id}...")
+        
+        # Start upload worker
+        self.upload_worker = UploadWorker(self.scraper, self.current_gallery_id, files)
+        self.upload_worker.progress.connect(self.on_upload_progress)
+        self.upload_worker.finished.connect(self.on_upload_finished)
+        self.upload_worker.start()
+    
+    def on_upload_progress(self, message):
+        """Handle upload progress updates"""
+        self.progress_text.append(message)
+        self.progress_text.ensureCursorVisible()
+    
+    def on_upload_finished(self, success, message):
+        """Handle upload completion"""
+        self.progress_bar.setVisible(False)
+        self.progress_text.append(f"\n{message}")
+        
+        if success:
+            # Refresh the current gallery
+            if self.current_gallery_id:
+                self.load_gallery_icons(self.current_gallery_id)
+            # Refresh gallery list to update icon counts
+            self.load_galleries()
+
+class LoginDialog(QDialog):
+    """Login dialog for credentials"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Glowfic Login")
+        self.setModal(True)
+        self.setFixedSize(350, 200)
+        
+        layout = QFormLayout()
+        
+        # Username field
+        self.username_input = QLineEdit()
+        self.username_input.setPlaceholderText("Enter your Glowfic username")
+        
+        # Password field  
+        self.password_input = QLineEdit()
+        self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.password_input.setPlaceholderText("Enter your password")
+        
+        # Remember checkbox
+        self.remember_check = QCheckBox("Remember credentials")
+        self.remember_check.setChecked(True)
+        
+        # Buttons
+        button_layout = QHBoxLayout()
+        self.login_button = QPushButton("Login")
+        self.cancel_button = QPushButton("Cancel")
+        
+        self.login_button.clicked.connect(self.accept)
+        self.cancel_button.clicked.connect(self.reject)
+        self.login_button.setDefault(True)
+        
+        button_layout.addWidget(self.cancel_button)
+        button_layout.addWidget(self.login_button)
+        
+        # Add to form
+        layout.addRow("Username:", self.username_input)
+        layout.addRow("Password:", self.password_input)
+        layout.addRow(self.remember_check)
+        layout.addRow(button_layout)
+        
+        self.setLayout(layout)
+        
+        # Try to load stored credentials
+        self.load_stored_credentials()
+    
+    def load_stored_credentials(self):
+        """Load credentials from keyring if available"""
+        try:
+            stored_username = keyring.get_password("glowfic.com", "username")
+            if stored_username:
+                self.username_input.setText(stored_username)
+                stored_password = keyring.get_password("glowfic.com", stored_username)
+                if stored_password:
+                    self.password_input.setText(stored_password)
+        except Exception:
+            pass  # Ignore keyring errors
+    
+    def get_credentials(self):
+        """Get the entered credentials"""
+        return self.username_input.text().strip(), self.password_input.text().strip()
+    
+    def should_remember(self):
+        """Check if credentials should be remembered"""
+        return self.remember_check.isChecked()
+
+def get_credentials_for_gui():
+    """Get credentials for GUI mode using Qt dialog"""
+    # Try .env first
+    username = os.getenv('GLOWFIC_USERNAME')
+    password = os.getenv('GLOWFIC_PASSWORD')
+    
+    if username and password:
+        return username, password
+    
+    # Show login dialog
+    app = QApplication.instance()
+    if not app:
+        app = QApplication([])
+    
+    dialog = LoginDialog()
+    if dialog.exec() == QDialog.DialogCode.Accepted:
+        username, password = dialog.get_credentials()
+        
+        if username and password and dialog.should_remember():
+            try:
+                keyring.set_password("glowfic.com", username, password)
+                keyring.set_password("glowfic.com", "username", username)
+            except Exception as e:
+                print(f"Warning: Could not store credentials: {e}")
+        
+        return username, password
+    
+    return None, None
+
 def main():
     # Parse command line arguments
-    parser = argparse.ArgumentParser(description='Glowfic scraper')
-    parser.add_argument('--url', help='URL path to fetch (e.g., /users/471/galleries)')
-    parser.add_argument('--list-galleries', action='store_true', help='List user galleries')
-    parser.add_argument('--upload', help='Path to image file to upload')
-    parser.add_argument('--gallery', help='Gallery ID to upload to (required with --upload)')
-    parser.add_argument('--keyword', help='Keyword for uploaded icon')
-    parser.add_argument('--credit', help='Credit for uploaded icon') 
-    parser.add_argument('--icon-url', help='URL for uploaded icon')
-    parser.add_argument('--resize', help='Resize image to 150x150 and save locally (provide output filename)')
+    parser = argparse.ArgumentParser(
+        description='Glowfic Icon Upload Tool - Automated gallery management for glowfic.com',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  %(prog)s --list-galleries
+  %(prog)s --url /users/471/galleries
+  %(prog)s --upload portrait.jpg --gallery 27821 --keyword "happy expression"
+  %(prog)s --resize output.jpg --upload large_image.png
+
+The tool automatically handles authentication, image resizing to 150x150 pixels,
+S3 upload, and gallery management through the Glowfic API.
+        """
+    )
+    
+    parser.add_argument('--url', metavar='PATH', 
+                       help='Fetch any authenticated URL path (e.g., /users/471/galleries)')
+    parser.add_argument('--list-galleries', action='store_true', 
+                       help='Display all user galleries with icon counts')
+    parser.add_argument('--upload', metavar='FILE', 
+                       help='Path to image file to upload (auto-resized to 150x150)')
+    parser.add_argument('--gallery', metavar='ID', 
+                       help='Gallery ID for upload (required with --upload)')
+    parser.add_argument('--keyword', metavar='TEXT', 
+                       help='Keyword/description for uploaded icon')
+    parser.add_argument('--credit', metavar='TEXT', 
+                       help='Artist credit for uploaded icon') 
+    parser.add_argument('--icon-url', metavar='URL', 
+                       help='Source URL for uploaded icon (optional)')
+    parser.add_argument('--resize', metavar='OUTPUT', 
+                       help='Resize image to 150x150 and save locally (requires --upload)')
+    parser.add_argument('--gui', action='store_true',
+                       help='Launch graphical user interface')
+    
     args = parser.parse_args()
     
     # Load environment variables from .env file
     load_dotenv()
     
     scraper = GlowficScraper()
+    
+    # Handle GUI launch
+    if args.gui:
+        load_dotenv()
+        
+        # Try to load existing cookies
+        scraper.load_cookies()
+        
+        # Check if already logged in
+        if not scraper.is_logged_in():
+            username, password = get_credentials_for_gui()
+            
+            if not username or not password:
+                print("Login cancelled")
+                return
+            
+            if not scraper.login(username, password, True):
+                QMessageBox.critical(None, "Login Failed", "Invalid username or password")
+                return
+            
+            scraper.save_cookies()
+        
+        # Launch GUI
+        app = QApplication.instance()
+        if not app:
+            app = QApplication(sys.argv)
+        
+        window = GlowficGUI(scraper)
+        window.show()
+        sys.exit(app.exec())
     
     # Handle resize command (doesn't need login)
     if args.resize:
@@ -631,13 +1138,20 @@ def main():
             print("Upload failed!")
         return
     
-    # Example: Scrape a specific page
-    print("\nScraper ready. You can now use it to scrape pages.")
-    print("Example usage:")
-    print("  ./glowfic_scraper.py --url /posts")
-    print("  ./glowfic_scraper.py --url /users/471/galleries")
+    # No command specified - show help
+    print("\nGlowfic Scraper v1.0")
+    print("Successfully authenticated as: girllich")
+    print("\nAvailable commands:")
+    print("  --list-galleries              List all your galleries")
+    print("  --url <path>                  Fetch any authenticated URL")
+    print("  --upload <file> --gallery <id> Upload icon to gallery")
+    print("  --resize <output> --upload <file> Resize image to 150x150")
+    print("\nExamples:")
     print("  ./glowfic_scraper.py --list-galleries")
-    print("  ./glowfic_scraper.py --upload image.jpg --gallery 19703 --keyword 'test'")
+    print("  ./glowfic_scraper.py --url /users/471/galleries") 
+    print("  ./glowfic_scraper.py --upload icon.jpg --gallery 27821 --keyword 'expression'")
+    print("  ./glowfic_scraper.py --resize test.jpg --upload original.png")
+    print("\nFor more options: ./glowfic_scraper.py --help")
 
 if __name__ == "__main__":
     main()
